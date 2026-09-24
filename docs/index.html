@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Operations Ledger — Monthly Summary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F1F3EC;
+    --card:#FBFCF9;
+    --ink:#1E2A20;
+    --ink-soft:#5B6B5C;
+    --line:#CBD2C2;
+    --pos:#35664F;
+    --neg:#9C3B2E;
+    --pos-tint:#E3EBE2;
+    --neg-tint:#F4E4DF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    padding: max(28px, env(safe-area-inset-top)) 20px 40px;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    border-bottom: 1.5px solid var(--ink); padding-bottom:18px; margin-bottom:28px;
+    flex-wrap: wrap; gap: 12px;
+  }
+  h1{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size: clamp(26px, 4vw, 34px);
+    margin:0 0 6px 0;
+    letter-spacing: -0.01em;
+  }
+  header p{ margin:0; color:var(--ink-soft); font-size:14px; max-width:46ch; }
+  .meta{ text-align:right; font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-soft); }
+  .kpis{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:32px;
+  }
+  @media (max-width: 640px){ .kpis{ grid-template-columns:repeat(2,1fr);} }
+  .kpi{
+    background:var(--card); border:1px solid var(--line); border-radius:4px;
+    padding:16px 16px 14px;
+  }
+  .kpi .label{ font-size:12px; color:var(--ink-soft); margin-bottom:8px; }
+  .kpi .value{ font-family:'IBM Plex Mono', monospace; font-size:24px; font-weight:500; }
+  .kpi .delta{ font-size:12px; margin-top:6px; font-family:'IBM Plex Mono', monospace; }
+  .delta.up{ color:var(--pos); } .delta.down{ color:var(--neg); }
+  .charts{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-bottom:32px; }
+  @media (max-width: 780px){ .charts{ grid-template-columns:1fr; } }
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:4px; padding:16px; }
+  .panel h2{ font-family:'Source Serif 4', serif; font-weight:600; font-size:16px; margin:0 0 12px 0; }
+  table{ width:100%; border-collapse:collapse; font-family:'IBM Plex Mono', monospace; font-size:13px; }
+  thead th{ text-align:right; font-family:'Inter',sans-serif; font-weight:500; font-size:12px; color:var(--ink-soft); border-bottom:1.5px solid var(--ink); padding:8px 6px; }
+  thead th:first-child, tbody td:first-child{ text-align:left; }
+  tbody td{ text-align:right; padding:7px 6px; border-bottom:1px solid var(--line); }
+  tbody tr:hover{ background:var(--pos-tint); }
+  .neg-cell{ color:var(--neg); }
+  footer{ margin-top:28px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-soft); line-height:1.6; }
+  footer code{ background:var(--pos-tint); padding:1px 5px; border-radius:3px; font-family:'IBM Plex Mono',monospace; }
+  .loading, .error{ padding: 60px 0; text-align:center; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Operations Ledger</h1>
+    <p>Signups, revenue and churn, pulled and reconciled from the raw monthly exports automatically.</p>
+  </div>
+  <div class="meta" id="meta-block">loading —</div>
+</header>
+
+<div id="app">
+  <div class="loading">reading data.json …</div>
+</div>
+
+<footer id="footer" style="display:none">
+  Source: <code>data/raw_signups.csv</code>, <code>data/raw_revenue.csv</code>, <code>data/raw_churn.csv</code>
+  → cleaned and aggregated by <code>scripts/process_data.py</code> → this page reads <code>dashboard/data.json</code>.
+  No step in between is done by hand.
+</footer>
+
+<script>
+async function init(){
+  let data;
+  try {
+    const res = await fetch('./data.json');
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('app').innerHTML = '<div class="error">Could not load data.json. Run scripts/process_data.py first, then serve this folder (e.g. python -m http.server) rather than opening the file directly.</div>';
+    return;
+  }
+  render(data);
+}
+
+function fmtMoney(n){
+  return '₦' + Math.round(n).toLocaleString('en-NG');
+}
+
+function render(data){
+  const n = data.months.length;
+  const last = n - 1, prev = n - 2;
+
+  document.getElementById('meta-block').textContent = 'last processed · ' + data.months[last];
+
+  const kpis = [
+    { label:'Net revenue, this month', value: fmtMoney(data.net_revenue[last]),
+      delta: pctDelta(data.net_revenue[prev], data.net_revenue[last]) },
+    { label:'Active customers', value: data.active_customers[last].toLocaleString(),
+      delta: pctDelta(data.active_customers[prev], data.active_customers[last]) },
+    { label:'New signups, this month', value: data.new_signups[last].toLocaleString(),
+      delta: pctDelta(data.new_signups[prev], data.new_signups[last]) },
+    { label:'Churn rate', value: data.churn_rate_pct[last] + '%',
+      delta: pctDelta(data.churn_rate_pct[prev], data.churn_rate_pct[last], true) },
+  ];
+
+  const kpiHtml = kpis.map(k => `
+    <div class="kpi">
+      <div class="label">${k.label}</div>
+      <div class="value">${k.value}</div>
+      <div class="delta ${k.delta.dir}">${k.delta.text}</div>
+    </div>`).join('');
+
+  const rows = data.months.map((m,i) => `
+    <tr>
+      <td>${m}</td>
+      <td>${data.new_signups[i]}</td>
+      <td>${fmtMoney(data.net_revenue[i])}</td>
+      <td>${data.active_customers[i]}</td>
+      <td class="${data.churned_customers[i] > 0 ? 'neg-cell' : ''}">${data.churned_customers[i]}</td>
+      <td class="${data.churn_rate_pct[i] > 2.5 ? 'neg-cell' : ''}">${data.churn_rate_pct[i]}%</td>
+    </tr>`).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="kpis">${kpiHtml}</div>
+    <div class="charts">
+      <div class="panel"><h2>Revenue, by month</h2><canvas id="revChart" height="180"></canvas></div>
+      <div class="panel"><h2>Signups vs. churn</h2><canvas id="growthChart" height="180"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Monthly breakdown</h2>
+      <table>
+        <thead><tr><th>Month</th><th>Signups</th><th>Revenue</th><th>Active</th><th>Churned</th><th>Churn %</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById('footer').style.display = 'block';
+
+  drawCharts(data);
+}
+
+function pctDelta(prev, curr, lowerIsBetter){
+  if (prev === 0 || prev === undefined) return { dir:'', text:'—' };
+  const pct = ((curr - prev) / Math.abs(prev)) * 100;
+  const good = lowerIsBetter ? pct <= 0 : pct >= 0;
+  const sign = pct >= 0 ? '+' : '';
+  return { dir: good ? 'up' : 'down', text: `${sign}${pct.toFixed(1)}% vs prior month` };
+}
+
+function drawCharts(data){
+  const ink = '#1E2A20', pos = '#35664F', neg = '#9C3B2E', line = '#CBD2C2';
+  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+  Chart.defaults.color = '#5B6B5C';
+
+  new Chart(document.getElementById('revChart'), {
+    type: 'line',
+    data: {
+      labels: data.months,
+      datasets: [{
+        data: data.net_revenue,
+        borderColor: pos, backgroundColor: 'rgba(53,102,79,0.08)',
+        fill: true, tension: 0.25, pointRadius: 2, borderWidth: 2,
+      }]
+    },
+    options: {
+      plugins: { legend: { display:false } },
+      scales: { y: { grid:{ color: line }, ticks:{ callback: v => '₦' + (v/1000)+'k' } }, x: { grid:{ display:false } } }
+    }
+  });
+
+  new Chart(document.getElementById('growthChart'), {
+    type: 'bar',
+    data: {
+      labels: data.months,
+      datasets: [
+        { label:'New signups', data: data.new_signups, backgroundColor: pos },
+        { label:'Churned', data: data.churned_customers, backgroundColor: neg },
+      ]
+    },
+    options: {
+      plugins: { legend: { position:'bottom', labels:{ boxWidth:10 } } },
+      scales: { y: { grid:{ color: line } }, x: { grid:{ display:false } } }
+    }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
