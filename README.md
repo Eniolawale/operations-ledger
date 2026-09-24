@@ -1,48 +1,40 @@
 # Operations Ledger
 
-A small pipeline that takes messy raw exports (signups, revenue, churn) and turns them into a clean monthly dashboard automatically, no manual spreadsheet rebuilding.
+Takes messy raw exports (signups, revenue, churn) and turns them into a clean monthly dashboard. No manual spreadsheet rebuilding every week.
 
 **Live preview:** https://Eniolawale.github.io/operations-ledger/
 
 ## Why I built this
 
-Early-stage teams usually track signups, revenue and churn across a few disconnected exports, and someone ends up manually pulling them into a spreadsheet every week. That's slow and it's where mistakes creep in (duplicate rows, inconsistent date formats, blank fields get silently included or silently dropped).
+I kept seeing the same problem: signups, revenue and churn sitting in separate exports, someone pulling them into a spreadsheet by hand every week, and mistakes creeping in every time, duplicate rows, three different date formats in the same file, blank fields nobody caught.
 
-This project is a small version of that pipeline: raw data in, one command, clean dashboard out.
+So I built a small version of the fix. Raw data goes in, a script cleans it and catches the specific things that usually go wrong, and a dashboard shows the result.
 
-I'm not presenting this as production-grade engineering. I'm not a developer. This is a working demonstration of how I think about a data problem: clean it properly, automate the repeatable part, and make the output legible to someone non-technical in five seconds.
+I'm not a developer and I'm not calling this production engineering. It's proof of how I approach a messy data problem: clean it properly, automate the part that repeats, and make the output something a non-technical person can actually read.
 
 ## What it does
 
-1. `scripts/generate_raw_data.py` — generates synthetic raw exports shaped like real early-stage startup data, deliberately messy (three different date formats, duplicate rows, some blank amounts). This step exists only to give the pipeline something realistic to clean; it's not part of the actual "product."
-2. `scripts/process_data.py` — the real work. Parses the mixed date formats, drops duplicate transactions and duplicate signup rows, drops rows with missing revenue amounts, and aggregates everything into one clean monthly summary. Prints exactly what it dropped and why.
-3. `dashboard/index.html` — reads the processed data and renders it: four headline metrics, a revenue trend, a signups-vs-churn chart, and a monthly table. No build step, just HTML/CSS/JS and Chart.js from a CDN.
+- `scripts/generate_raw_data.py` generates fake raw exports shaped like real early-stage data, on purpose messy (three date formats, duplicate rows, some blank amounts). This only exists to give the pipeline something to clean, it's not part of the actual project.
+- `scripts/process_data.py` is the real work. Parses the mixed date formats, drops duplicate transactions and duplicate signups, drops rows with missing amounts, aggregates it all into one clean monthly summary. Prints what it dropped and why, so nothing disappears silently.
+- `dashboard/index.html` reads the processed data and shows it: four headline numbers, a revenue trend, signups vs churn, a monthly table. Plain HTML/CSS/JS, Chart.js from a CDN, no build step.
 
-## Running it yourself
+## Running it
 
 ```bash
 pip install pandas
 python scripts/generate_raw_data.py   # creates the raw sample data
 python scripts/process_data.py        # cleans it, writes dashboard/data.json
-python -m http.server 8000            # then open dashboard/index.html in a browser
+python -m http.server 8000            # open dashboard/index.html
 ```
 
-(The dashboard fetches `data.json`, so it needs to be served, not opened directly as a file.)
+The dashboard fetches `data.json`, so it needs to be served, not opened directly as a file.
 
-## What this demonstrates
+## What this actually shows, and what it doesn't
 
-- I can take raw, inconsistent data and produce something reliable without being handed a clean dataset first.
-- I default to automating a repeatable manual task rather than redoing it by hand each time.
-- I can build something a non-technical person can read and understand immediately.
+I can take inconsistent raw data and get something reliable out of it without someone handing me a clean dataset first. I'd rather automate a task that repeats than redo it by hand each time. And I can build something a non-technical person understands in a glance.
 
-## What this does *not* demonstrate
-
-I want to be direct about this rather than let the project oversell itself:
-
-- This is not DevOps work. There's no infrastructure, deployment pipeline, or server management here.
-- This is not production software engineering. It's a single-purpose script and a static page, built to prove a point, not to scale.
-- My Python here is functional, not expert-level. `process_data.py` is the most complex thing I've written in it so far.
+What it isn't: DevOps work, there's no infrastructure or deployment here. Production software, it's a single script and a static page. Expert-level Python, this is the most I've done with pandas so far, and I'm saying that plainly rather than letting the project imply otherwise.
 
 ## Data
 
-All data in `data/raw_*.csv` is synthetic, generated by `generate_raw_data.py`. Nothing in this repo is real company data.
+Everything in `data/raw_*.csv` is synthetic, generated by `generate_raw_data.py`. No real company data anywhere in this repo.
