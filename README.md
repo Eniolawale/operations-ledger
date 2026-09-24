@@ -2,7 +2,7 @@
 
 A small pipeline that takes messy raw exports (signups, revenue, churn) and turns them into a clean monthly dashboard automatically, no manual spreadsheet rebuilding.
 
-**Live preview:** *[add your hosted link here once you publish `dashboard/index.html`, e.g. via GitHub Pages]*
+**Live preview:** https://Eniolawale.github.io/operations-ledger/
 
 ## Why I built this
 
